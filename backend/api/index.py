@@ -7,8 +7,6 @@ from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения из backend/.env
-load_dotenv()
 
 security = HTTPBearer()
 redis_client = None
@@ -20,7 +18,7 @@ async def lifespan(app: FastAPI):
     # Получаем переменные окружения
     rest_url = os.getenv("UPSTASH_REDIS_REST_URL")
     rest_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-    
+    print(f"rest_url:{rest_url}"
     if not rest_url or not rest_token:
         raise RuntimeError("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required")
     
