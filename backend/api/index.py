@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Query, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import redis.asyncio as redis
+from upstash_redis.asyncio import Redis
 import os
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from urllib.parse import urlparse
 from dotenv import load_dotenv
 
+# Загружаем .env только для локальной разработки
+if os.path.exists(".env"):
+    load_dotenv()
 
 security = HTTPBearer()
 redis_client = None
@@ -15,36 +17,22 @@ redis_client = None
 async def lifespan(app: FastAPI):
     global redis_client
     
-    # Получаем переменные окружения
     rest_url = os.getenv("UPSTASH_REDIS_REST_URL")
     rest_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-    print(f"rest_url:{rest_url}")
+    
     if not rest_url or not rest_token:
         raise RuntimeError("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required")
     
     try:
-        # Парсим URL для получения host и порта
-        parsed = urlparse(rest_url)
-        host = parsed.hostname
-        port = parsed.port or 6379
-        
-        # Создаем подключение с SSL
-        redis_client = redis.Redis(
-            host=host,
-            port=port,
-            password=rest_token,  # ← токен используется как пароль
-            ssl=True,
-            ssl_check_hostname=False,
-            decode_responses=True,
-            socket_keepalive=True,
-            retry_on_timeout=True,
-            socket_timeout=5,
-            socket_connect_timeout=5
+        # Используем upstash_redis - просто передаем URL и токен
+        redis_client = Redis(
+            url=rest_url,
+            token=rest_token
         )
         
-        print(f"✅ Connected to Upstash Redis: {host}:{port}")
+        print(f"✅ Connected to Upstash Redis")
         
-        # Проверка подключения
+        # Проверка подключения (опционально)
         await redis_client.ping()
         print("✅ Redis ping successful")
         
@@ -54,7 +42,7 @@ async def lifespan(app: FastAPI):
     
     yield
     
-# Закрытие подключения
+    # upstash_redis не требует явного закрытия, но для чистоты оставим
     if redis_client:
         await redis_client.close()
         print("🔒 Redis connection closed")
@@ -175,35 +163,21 @@ async def list_all_subscriptions(admin: str = Depends(verify_admin)):
     if not keys:
         return {"total": 0, "subscriptions": {}}
     
-    # Определяем типы ключей одним батчем (некоторые ключи Upstash
-    # могут быть не строками, GET по ним вернёт WRONGTYPE)
-    pipe = redis_client.pipeline()
-    for key in keys:
-        pipe.type(key)
-    types = await pipe.execute()
-    
-    # Забираем только строковые ключи одним батчем
-    string_keys = [key for key, key_type in zip(keys, types) if key_type == "string"]
-    if not string_keys:
-        return {"total": 0, "subscriptions": {}}
-    
-    pipe = redis_client.pipeline()
-    for key in string_keys:
-        pipe.get(key)
-    values = await pipe.execute()
-    
+    # upstash_redis не поддерживает pipeline, поэтому обрабатываем последовательно
     result = {}
     current_time = get_current_time()
     
-    for key, timestamp_str in zip(string_keys, values):
+    for key in keys:
         try:
-            timestamp = int(timestamp_str)
-            result[key] = {
-                "expires_at": timestamp,
-                "expires_at_iso": datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(),
-                "is_active": timestamp > current_time,
-                "days_remaining": round((timestamp - current_time) / 86400, 1) if timestamp > current_time else 0
-            }
+            timestamp_str = await redis_client.get(key)
+            if timestamp_str:
+                timestamp = int(timestamp_str)
+                result[key] = {
+                    "expires_at": timestamp,
+                    "expires_at_iso": datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(),
+                    "is_active": timestamp > current_time,
+                    "days_remaining": round((timestamp - current_time) / 86400, 1) if timestamp > current_time else 0
+                }
         except (ValueError, TypeError):
             result[key] = {"error": "Invalid data format"}
     
