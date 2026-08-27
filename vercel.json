@@ -1,0 +1,24 @@
+{
+  "services": {
+    "frontend": {
+      "root": "frontend/",
+      "framework": "vue",
+      "buildCommand": "npm run build",
+      "devCommand": "npm run dev"
+    },
+    "backend": {
+      "root": "backend/",
+      "entrypoint": "api/index.py:app"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": { "service": "backend" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "frontend" }
+    }
+  ]
+}
