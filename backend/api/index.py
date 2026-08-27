@@ -25,10 +25,7 @@ async def lifespan(app: FastAPI):
     
     try:
         # Используем upstash_redis - просто передаем URL и токен
-        redis_client = Redis(
-            url=rest_url,
-            token=rest_token
-        )
+        redis_client = Redis.from_env()
         
         print(f"✅ Connected to Upstash Redis")
         
