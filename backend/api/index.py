@@ -240,26 +240,25 @@ async def proxy_file(url: str, file_size: int):
     try:
         # Используем потоковую передачу для экономии памяти
         async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("GET", url) as response:
-                if response.status_code != 200:
-                    raise HTTPException(
-                        status_code=response.status_code,
-                        detail="Failed to fetch file"
-                    )
-                
-                # Отдаем файл потоком
-                return StreamingResponse(
-                    response.aiter_bytes(),
-                    media_type="application/zip",
-                    headers={
-                        "Content-Disposition": "attachment; filename=update.zip",
-                        "Content-Length": str(file_size),
-                        "X-File-Source": "blob-proxy",
-                        "Cache-Control": "no-cache, no-store",
-                        "Access-Control-Allow-Origin": "*"  # Для CORS
-                    }
+            response = await client.get(FILE_URL)
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Failed to fetch file"
                 )
-                
+            
+            # Возвращаем как StreamingResponse с данными в памяти
+            return StreamingResponse(
+                iter([response.content]),  # ⬅️ Важно: iter([...]) а не response.aiter_bytes()
+                media_type="application/zip",
+                headers={
+                    "Content-Disposition": "attachment; filename=update.zip",
+                    "Content-Length": str(len(response.content)),
+                    "X-File-Source": "blob-proxy",
+                    "Cache-Control": "no-cache, no-store"
+                }
+            )          
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=504,
