@@ -2,6 +2,7 @@ from fastapi import FastAPI, Query, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from upstash_redis.asyncio import Redis
 import os
+import httpx
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -206,3 +207,23 @@ async def api_root():
             "docs": "/api/docs"
         }
     }
+
+async def check_file_availability(url: str):
+    """Проверка доступности файла и получение его размера"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.head(url, timeout=5.0)
+            if response.status_code == 200:
+                size = int(response.headers.get("content-length", 0))
+                return {
+                    "available": True,
+                    "size": size,
+                    "content_type": response.headers.get("content-type", "application/zip")
+                }
+            else:
+                return {"available": False, "status_code": response.status_code}
+                
+        except httpx.TimeoutException:
+            return {"available": False, "error": "Timeout"}
+        except Exception as e:
+            return {"available": False, "error": str(e)}
