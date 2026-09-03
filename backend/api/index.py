@@ -77,7 +77,7 @@ FILE_NAME = DEV_FILE if IS_DEVELOPMENT else PROD_FILE
 FILE_URL = f"{BLOB_URL}/{FILE_NAME}"
 
 # ============ ПУБЛИЧНЫЙ ЭНДПОИНТ ============
-@app.get("/update/proxy")
+@app.get("/api/update/proxy")
 async def download_proxy():
     """Принудительная прямая отдача через сервер (обходит фаерволы)"""
     file_info = await check_file_availability(FILE_URL)
