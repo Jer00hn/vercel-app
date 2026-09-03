@@ -78,11 +78,44 @@ def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
 BLOB_URL = "https://sf9o8bhy9rirx6lg.public.blob.vercel-storage.com"
 DEV_FILE = "update-dev.zip"
 PROD_FILE = "update-bytecode.zip"
+VERSION_FILE = "version.json"
 IS_DEVELOPMENT = os.getenv("ENVIRONMENT") == "development"
 FILE_NAME = DEV_FILE if IS_DEVELOPMENT else PROD_FILE
 FILE_URL = f"{BLOB_URL}/{FILE_NAME}"
+VERSION_URL = f"{BLOB_URL}/{VERSION_FILE}"
 
 # ============ ПУБЛИЧНЫЙ ЭНДПОИНТ ============
+@app.get("/api/update/check")
+async def check_update():
+    """
+    Проверка версии обновления
+    Проксирует version.json из Blob как есть
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(VERSION_URL)
+            
+            if response.status_code == 200:
+                # Отдаем как есть
+                return response.json()
+            else:
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": "Version file not found"}
+                )
+                
+    except httpx.TimeoutException:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Version check timeout"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+
 @app.get("/api/update/proxy")
 async def download_proxy():
     print(f"check is aviable: {FILE_URL}")
