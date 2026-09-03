@@ -208,6 +208,45 @@ async def api_root():
         }
     }
 
+async def proxy_file(url: str, file_size: int):
+    """
+    Проксирование файла через сервер Vercel
+    Обходит фаерволы, т.к. клиент подключается только к вашему API
+    """
+    try:
+        # Используем потоковую передачу для экономии памяти
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream("GET", url) as response:
+                if response.status_code != 200:
+                    raise HTTPException(
+                        status_code=response.status_code,
+                        detail="Failed to fetch file"
+                    )
+                
+                # Отдаем файл потоком
+                return StreamingResponse(
+                    response.aiter_bytes(),
+                    media_type="application/zip",
+                    headers={
+                        "Content-Disposition": "attachment; filename=update.zip",
+                        "Content-Length": str(file_size),
+                        "X-File-Source": "blob-proxy",
+                        "Cache-Control": "no-cache, no-store",
+                        "Access-Control-Allow-Origin": "*"  # Для CORS
+                    }
+                )
+                
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Storage timeout - try using redirect endpoint"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Proxy download failed: {str(e)}"
+        )
+
 async def check_file_availability(url: str):
     """Проверка доступности файла и получение его размера"""
     async with httpx.AsyncClient() as client:
