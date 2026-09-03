@@ -68,8 +68,25 @@ def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
             headers={"WWW-Authenticate": "Bearer"}
         )
     return token
+    
+BLOB_URL = "https://sf9o8bhy9rirx6lg.blob.vercel-storage.com"
+DEV_FILE = "update-dev.zip"
+PROD_FILE = "update-bytecode.zip"
+IS_DEVELOPMENT = os.getenv("ENVIRONMENT") == "development"
+FILE_NAME = DEV_FILE if IS_DEVELOPMENT else PROD_FILE
+FILE_URL = f"{BLOB_URL}/{FILE_NAME}"
 
 # ============ ПУБЛИЧНЫЙ ЭНДПОИНТ ============
+@app.get("/update/proxy")
+async def download_proxy():
+    """Принудительная прямая отдача через сервер (обходит фаерволы)"""
+    file_info = await check_file_availability(FILE_URL)
+    
+    if not file_info["available"]:
+        return await fallback_to_github()
+    
+    return await proxy_file(FILE_URL, file_info["size"])
+    
 @app.get("/api/subscription/status")
 async def get_subscription_status(
     username: str = Query(..., min_length=2, max_length=50)
