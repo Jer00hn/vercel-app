@@ -1,5 +1,11 @@
 from fastapi import FastAPI, Query, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import (
+    FileResponse,      # Для локальных файлов
+    StreamingResponse, # Для потоковой передачи
+    JSONResponse,      # Для JSON ответов
+    RedirectResponse   # Для редиректов
+)
 from upstash_redis.asyncio import Redis
 import os
 import httpx
