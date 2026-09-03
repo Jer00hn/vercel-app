@@ -69,7 +69,7 @@ def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
         )
     return token
     
-BLOB_URL = "https://sf9o8bhy9rirx6lg.blob.vercel-storage.com"
+BLOB_URL = "https://sf9o8bhy9rirx6lg.public.blob.vercel-storage.com"
 DEV_FILE = "update-dev.zip"
 PROD_FILE = "update-bytecode.zip"
 IS_DEVELOPMENT = os.getenv("ENVIRONMENT") == "development"
