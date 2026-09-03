@@ -79,6 +79,7 @@ FILE_URL = f"{BLOB_URL}/{FILE_NAME}"
 # ============ ПУБЛИЧНЫЙ ЭНДПОИНТ ============
 @app.get("/api/update/proxy")
 async def download_proxy():
+    print(f"check is aviable: {FILE_URL}")
     """Принудительная прямая отдача через сервер (обходит фаерволы)"""
     file_info = await check_file_availability(FILE_URL)
     
