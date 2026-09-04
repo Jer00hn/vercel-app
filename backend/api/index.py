@@ -76,12 +76,18 @@ def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return token
     
 BLOB_URL = "https://sf9o8bhy9rirx6lg.public.blob.vercel-storage.com"
-DEV_FILE = "update-dev.zip"
-PROD_FILE = "update-bytecode.zip"
-VERSION_FILE = "version.json"
+
 IS_DEVELOPMENT = os.getenv("ENVIRONMENT") == "development"
-FILE_NAME = DEV_FILE if IS_DEVELOPMENT else PROD_FILE
-FILE_URL = f"{BLOB_URL}/{FILE_NAME}"
+
+if IS_DEVELOPMENT:
+    VERSION_FILE = "version-dev.json"
+    UPDATE_FILE = "update-dev.zip"
+else:
+    VERSION_FILE = "version-prod.json"
+    UPDATE_FILE = "update-bytecode.zip
+
+
+FILE_URL = f"{BLOB_URL}/{UPDATE_FILE}"
 VERSION_URL = f"{BLOB_URL}/{VERSION_FILE}"
 
 # ============ ПУБЛИЧНЫЙ ЭНДПОИНТ ============
