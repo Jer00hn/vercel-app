@@ -83,7 +83,7 @@ if IS_DEVELOPMENT:
     VERSION_FILE = "version-dev.json"
     UPDATE_FILE = "update-dev.zip"
 else:
-    VERSION_FILE = "version-prod.json"
+    VERSION_FILE = "version.json"
     UPDATE_FILE = "update-bytecode.zip"
 
 
