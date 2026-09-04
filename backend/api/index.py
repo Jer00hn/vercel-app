@@ -84,7 +84,7 @@ if IS_DEVELOPMENT:
     UPDATE_FILE = "update-dev.zip"
 else:
     VERSION_FILE = "version-prod.json"
-    UPDATE_FILE = "update-bytecode.zip
+    UPDATE_FILE = "update-bytecode.zip"
 
 
 FILE_URL = f"{BLOB_URL}/{UPDATE_FILE}"
