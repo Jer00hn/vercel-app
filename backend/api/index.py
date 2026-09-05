@@ -313,7 +313,7 @@ async def get_subscription_stats(admin: str = Depends(verify_admin)):
         "average_days_remaining": round(total_days / active, 1) if active > 0 else 0
     }
 
-@app.get("/api/subscription/admin/clear")
+@app.delete("/api/subscription/admin/clear")
 async def clear_all_subscriptions(admin: str = Depends(verify_admin)):
     
     await redis_client.delete(SUBSCRIPTIONS_HASH)
