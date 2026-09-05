@@ -8,6 +8,21 @@
           <p class="text-sm text-gray-500">v2.0.0 • Redis Hash</p>
         </div>
         <div class="flex gap-2">
+          <!-- Кнопка ручного обновления -->
+          <button
+            @click="loadData"
+            :disabled="loading"
+            class="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <svg v-if="!loading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <svg v-else class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {{ loading ? 'Загрузка...' : 'Обновить' }}
+          </button>
+
           <!-- Кнопка очистки (только для разработки) -->
           <button
             v-if="isDevelopment"
@@ -16,6 +31,7 @@
           >
             🗑️ Очистить всё
           </button>
+          
           <button
             @click="logout"
             class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
@@ -52,6 +68,11 @@
 
       <!-- Dashboard Content -->
       <div v-else>
+        <!-- Индикатор последнего обновления -->
+        <div class="text-xs text-gray-400 text-right mb-2">
+          Последнее обновление: {{ lastUpdated }}
+        </div>
+
         <StatsCards :stats="stats" />
         <SubscriptionForm @added="handleAdd" />
         <SubscriptionList
@@ -141,9 +162,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { subscriptionApi } from '../api'
-import StatsCards from '../components/StatsCard.vue'
+import StatsCards from '../components/StatsCards.vue'
 import SubscriptionForm from '../components/SubscriptionForm.vue'
 import SubscriptionList from '../components/SubscriptionList.vue'
 
@@ -153,13 +174,13 @@ const loading = ref(false)
 const clearing = ref(false)
 const stats = ref({})
 const subscriptions = ref([])
+const lastUpdated = ref('')
 const extendDialog = ref({
   show: false,
   username: '',
   days: 30
 })
 const showClearConfirm = ref(false)
-let refreshInterval
 
 // Определяем окружение (для показа кнопки очистки)
 const isDevelopment = computed(() => {
@@ -180,7 +201,15 @@ const logout = () => {
   localStorage.removeItem('admin_token')
   isAuthenticated.value = false
   tokenInput.value = ''
-  if (refreshInterval) clearInterval(refreshInterval)
+}
+
+const updateTimestamp = () => {
+  const now = new Date()
+  lastUpdated.value = now.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
 }
 
 const loadData = async () => {
@@ -200,6 +229,8 @@ const loadData = async () => {
       status: subs[username].is_active ? 'active' : 'expired'
     }))
 
+    updateTimestamp()
+
   } catch (error) {
     console.error('Failed to load data:', error)
     if (error.response?.status === 403) {
@@ -213,7 +244,7 @@ const loadData = async () => {
 const handleAdd = async ({ username, durationDays }) => {
   try {
     await subscriptionApi.addSubscription(username, durationDays)
-    await loadData()
+    await loadData() // Обновляем после добавления
   } catch (error) {
     console.error('Failed to add subscription:', error)
     alert('Ошибка при добавлении подписки')
@@ -235,7 +266,7 @@ const handleExtend = async () => {
       extendDialog.value.days
     )
     extendDialog.value.show = false
-    await loadData()
+    await loadData() // Обновляем после продления
   } catch (error) {
     console.error('Failed to extend subscription:', error)
     alert('Ошибка при продлении подписки')
@@ -247,7 +278,7 @@ const handleRevoke = async (username) => {
 
   try {
     await subscriptionApi.revokeSubscription(username)
-    await loadData()
+    await loadData() // Обновляем после отзыва
   } catch (error) {
     console.error('Failed to revoke subscription:', error)
     alert('Ошибка при отзыве подписки')
@@ -259,7 +290,7 @@ const handleClearAll = async () => {
   try {
     await subscriptionApi.clearAll()
     showClearConfirm.value = false
-    await loadData()
+    await loadData() // Обновляем после очистки
     alert('✅ Все подписки успешно очищены')
   } catch (error) {
     console.error('Failed to clear subscriptions:', error)
@@ -275,18 +306,6 @@ onMounted(() => {
     tokenInput.value = token
     isAuthenticated.value = true
     loadData()
-  }
-
-  refreshInterval = setInterval(() => {
-    if (isAuthenticated.value) {
-      loadData()
-    }
-  }, 30000)
-})
-
-onBeforeUnmount(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
   }
 })
 </script>
