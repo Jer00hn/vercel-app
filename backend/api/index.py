@@ -315,11 +315,6 @@ async def get_subscription_stats(admin: str = Depends(verify_admin)):
 
 @app.get("/api/subscription/admin/clear")
 async def clear_all_subscriptions(admin: str = Depends(verify_admin)):
-    if not IS_DEVELOPMENT:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available in development mode"
-        )
     
     await redis_client.delete(SUBSCRIPTIONS_HASH)
     return {
