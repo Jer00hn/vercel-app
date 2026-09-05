@@ -65,7 +65,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { subscriptionApi } from '../api'
-import StatsCards from '../components/StatsCards.vue'
+import StatsCards from '../components/StatsCard.vue'
 import SubscriptionForm from '../components/SubscriptionForm.vue'
 import SubscriptionList from '../components/SubscriptionList.vue'
 
