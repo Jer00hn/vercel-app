@@ -8,6 +8,7 @@ from fastapi.responses import (
 )
 from upstash_redis.asyncio import Redis
 import os
+import re
 import httpx
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -119,6 +120,29 @@ async def download_proxy():
         return await fallback_to_github()
     
     return await proxy_file(FILE_URL, file_info["size"])
+
+
+FILENAME_PATTERN = re.compile(r"^[\w.\- ]+$")
+
+@app.get("/api/download")
+async def download_file(
+    filename: str = Query(..., min_length=1, max_length=255, description="Name of the file to download")
+):
+    if not FILENAME_PATTERN.match(filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    file_url = f"{BLOB_URL}/{filename}"
+    print(f"download requested: {file_url}")
+    
+    file_info = await check_file_availability(file_url)
+    
+    if not file_info["available"]:
+        raise HTTPException(
+            status_code=404,
+            detail=f"File not found: {filename}"
+        )
+    
+    return await proxy_file(file_url, file_info["size"], filename)
 
 @app.get("/api/subscription/status")
 async def get_subscription_status(
@@ -354,10 +378,10 @@ async def api_root():
         }
     }
 
-async def proxy_file(url: str, file_size: int):
+async def proxy_file(url: str, file_size: int, filename: str = "update.zip"):
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(FILE_URL)
+            response = await client.get(url)
             
             if response.status_code != 200:
                 raise HTTPException(
@@ -367,9 +391,9 @@ async def proxy_file(url: str, file_size: int):
             
             return StreamingResponse(
                 iter([response.content]),
-                media_type="application/zip",
+                media_type="application/octet-stream",
                 headers={
-                    "Content-Disposition": "attachment; filename=update.zip",
+                    "Content-Disposition": f'attachment; filename="{filename}"',
                     "Content-Length": str(len(response.content)),
                     "X-File-Source": "blob-proxy",
                     "Cache-Control": "no-cache, no-store"
