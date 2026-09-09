@@ -294,9 +294,9 @@ async def list_all_subscriptions(
     active_count = 0
     expired_count = 0
     print(all_subscriptions)
-    for username, timestamp_str in all_subscriptions.items():
+    for username, data in all_subscriptions.items():
         try:
-            print(f"timestamp: {timestamp_str}")
+            timestamp_str = data.get("expiry")
             timestamp = int(timestamp_str)
             is_active = timestamp > current_time
             
@@ -312,7 +312,8 @@ async def list_all_subscriptions(
                 "expires_at": timestamp,
                 "expires_at_iso": datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(),
                 "is_active": is_active,
-                "days_remaining": round((timestamp - current_time) / 86400, 1) if is_active else 0
+                "days_remaining": round((timestamp - current_time) / 86400, 1) if is_active else 0,
+                "type": data.get("type", "none")
             }
         except (ValueError, TypeError):
             result[username] = {"error": "Invalid data format"}
