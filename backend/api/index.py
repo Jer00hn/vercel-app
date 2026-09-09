@@ -211,7 +211,7 @@ async def add_subscription(
     if type not in VALID_TYPES:
         type = basic
 
-    currenttime = getcurrent_time()
+    currenttime = get_current_time()
     newexpiry = currenttime + (duration_days * 86400)
 
     # Сохраняем оба поля в Redis Hash
