@@ -294,8 +294,9 @@ async def list_all_subscriptions(
     active_count = 0
     expired_count = 0
     print(all_subscriptions)
-    for username, data in all_subscriptions.items():
+    for username, data_str in all_subscriptions.items():
         try:
+            data = json.loads(data_str)
             timestamp_str = data.get("expiry")
             timestamp = int(timestamp_str)
             is_active = timestamp > current_time
