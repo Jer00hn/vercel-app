@@ -148,27 +148,47 @@ async def download_file(
 async def get_subscription_status(
     username: str = Query(..., min_length=2, max_length=50)
 ):
-    timestamp_str = await redis_client.hget(SUBSCRIPTIONS_HASH, username)
+    # Читаем ВСЕ поля подписки
+    data = await redis_client.hgetall(SUBSCRIPTIONS_HASH, username)
     
-    if timestamp_str is None:
+    if not data:
         return {
             "username": username,
             "status": "not_found",
             "is_active": False,
             "expires_at": None,
+            "expires_at_iso": None,
             "seconds_remaining": 0,
-            "days_remaining": 0
+            "days_remaining": 0,
+            "type": "none"
         }
-    
+
+    # Извлекаем expiry
+    timestamp_str = data.get("expiry")
+    sub_type = data.get("type", "none")  # новое поле
+
+    if timestamp_str is None:
+        # Странная ситуация: запись есть, но expiry нет
+        return {
+            "username": username,
+            "status": "invalid",
+            "is_active": False,
+            "expires_at": None,
+            "expires_at_iso": None,
+            "seconds_remaining": 0,
+            "days_remaining": 0,
+            "type": sub_type
+        }
+
     try:
         expires_at = int(timestamp_str)
     except ValueError:
         raise HTTPException(status_code=500, detail="Invalid subscription data")
-    
+
     current_time = get_current_time()
     is_active = current_time < expires_at
     seconds_remaining = expires_at - current_time if is_active else 0
-    
+
     return {
         "username": username,
         "status": "active" if is_active else "expired",
@@ -176,26 +196,36 @@ async def get_subscription_status(
         "expires_at": expires_at,
         "expires_at_iso": datetime.fromtimestamp(expires_at, tz=timezone.utc).isoformat(),
         "seconds_remaining": seconds_remaining,
-        "days_remaining": round(seconds_remaining / 86400, 1) if is_active else 0
+        "days_remaining": round(seconds_remaining / 86400, 1) if is_active else 0,
+        "type": sub_type
     }
 
 @app.post("/api/subscription/admin/add")
 async def add_subscription(
-    username: str = Query(..., min_length=2, max_length=50),
+    username: str = Query(..., minlength=2, maxlength=50),
     duration_days: int = Query(..., gt=0, le=3650),
+    type: str = Query("none", description="Тип подписки: none/basic/extended"),
     admin: str = Depends(verify_admin)
 ):
-    current_time = get_current_time()
-    new_expiry = current_time + (duration_days * 86400)
-    
-    await redis_client.hset(SUBSCRIPTIONS_HASH, username, str(new_expiry))
-    
+    if type not in VALID_TYPES:
+        raise HTTPException(status_code=400, detail="Некорректный тип подписки")
+
+    currenttime = getcurrent_time()
+    newexpiry = currenttime + (duration_days * 86400)
+
+    # Сохраняем оба поля в Redis Hash
+    await redisclient.hset(SUBSCRIPTIONSHASH, username, {
+        "expiry": str(new_expiry),
+        "type": type
+    })
+
     return {
         "success": True,
         "username": username,
-        "duration_days": duration_days,
-        "expires_at": new_expiry,
-        "expires_at_iso": datetime.fromtimestamp(new_expiry, tz=timezone.utc).isoformat()
+        "durationdays": durationdays,
+        "type": type,
+        "expiresat": newexpiry,
+        "expiresatiso": datetime.fromtimestamp(new_expiry, tz=timezone.utc).isoformat()
     }
 
 @app.put("/api/subscription/admin/extend")
