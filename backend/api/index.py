@@ -190,7 +190,7 @@ async def get_subscription_status(
     is_active = current_time < expires_at
     seconds_remaining = expires_at - current_time if is_active else 0
 
-    return {
+    user = {
         "username": username,
         "status": "active" if is_active else "expired",
         "is_active": is_active,
@@ -200,6 +200,8 @@ async def get_subscription_status(
         "days_remaining": round(seconds_remaining / 86400, 1) if is_active else 0,
         "type": sub_type
     }
+    print(user)
+    return user
 
 @app.post("/api/subscription/admin/add")
 async def add_subscription(
@@ -220,7 +222,7 @@ async def add_subscription(
         "type": type
     })
 
-    return {
+    user = {
         "success": True,
         "username": username,
         "durationdays": duration_days,
@@ -228,6 +230,8 @@ async def add_subscription(
         "expiresat": new_expiry,
         "expiresatiso": datetime.fromtimestamp(new_expiry, tz=timezone.utc).isoformat()
     }
+    print(user)
+    return user
 
 @app.put("/api/subscription/admin/extend")
 async def extend_subscription(
@@ -311,7 +315,7 @@ async def list_all_subscriptions(
             }
         except (ValueError, TypeError):
             result[username] = {"error": "Invalid data format"}
-    
+    print (result)
     if limit and len(result) > limit:
         sorted_items = sorted(
             result.items(),
