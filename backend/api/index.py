@@ -209,13 +209,13 @@ async def add_subscription(
     admin: str = Depends(verify_admin)
 ):
     if type not in VALID_TYPES:
-        type = basic
+        type = "basic"
 
     currenttime = get_current_time()
     newexpiry = currenttime + (duration_days * 86400)
 
     # Сохраняем оба поля в Redis Hash
-    await redis_client.hset(SUBSCRIPTIONSHASH, username, {
+    await redis_client.hset(SUBSCRIPTIONS_HASH, username, {
         "expiry": str(new_expiry),
         "type": type
     })
