@@ -151,8 +151,8 @@ async def get_subscription_status(
     username: str = Query(..., min_length=2, max_length=50)
 ):
     # Читаем ВСЕ поля подписки
-    data = await redis_client.hget(SUBSCRIPTIONS_HASH, username)
-    
+    raw = await redis_client.hget(SUBSCRIPTIONS_HASH, username)
+    data = json.loads(raw)
     if not data:
         return {
             "username": username,
