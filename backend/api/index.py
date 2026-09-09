@@ -21,6 +21,7 @@ security = HTTPBearer()
 redis_client = None
 
 SUBSCRIPTIONS_HASH = "subscriptions"
+VALID_TYPES = {"none", "basic", "extended"}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -208,7 +209,7 @@ async def add_subscription(
     admin: str = Depends(verify_admin)
 ):
     if type not in VALID_TYPES:
-        raise HTTPException(status_code=400, detail="Некорректный тип подписки")
+        type = basic
 
     currenttime = getcurrent_time()
     newexpiry = currenttime + (duration_days * 86400)
