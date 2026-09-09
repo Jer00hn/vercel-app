@@ -225,10 +225,10 @@ async def add_subscription(
     user = {
         "success": True,
         "username": username,
-        "durationdays": duration_days,
+        "duration_days": duration_days,
         "type": type,
-        "expiresat": new_expiry,
-        "expiresatiso": datetime.fromtimestamp(new_expiry, tz=timezone.utc).isoformat()
+        "expires_at": new_expiry,
+        "expires_at_iso": datetime.fromtimestamp(new_expiry, tz=timezone.utc).isoformat()
     }
     print(user)
     return user
