@@ -215,7 +215,7 @@ async def add_subscription(
     newexpiry = currenttime + (duration_days * 86400)
 
     # Сохраняем оба поля в Redis Hash
-    await redisclient.hset(SUBSCRIPTIONSHASH, username, {
+    await redis_client.hset(SUBSCRIPTIONSHASH, username, {
         "expiry": str(new_expiry),
         "type": type
     })
