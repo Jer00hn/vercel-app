@@ -293,7 +293,7 @@ async def list_all_subscriptions(
     current_time = get_current_time()
     active_count = 0
     expired_count = 0
-    
+    print(all_subscriptions)
     for username, timestamp_str in all_subscriptions.items():
         try:
             timestamp = int(timestamp_str)
