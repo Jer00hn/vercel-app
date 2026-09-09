@@ -296,6 +296,7 @@ async def list_all_subscriptions(
     print(all_subscriptions)
     for username, timestamp_str in all_subscriptions.items():
         try:
+            print(f"timestamp: {timestamp_str}")
             timestamp = int(timestamp_str)
             is_active = timestamp > current_time
             
