@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException, Depends
+from fastapi import FastAPI, Query, HTTPException, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import (
     FileResponse,
@@ -7,6 +7,7 @@ from fastapi.responses import (
     RedirectResponse
 )
 from upstash_redis.asyncio import Redis
+from vercel.blob import AsyncBlobClient
 import os
 import re
 import json
@@ -87,6 +88,38 @@ else:
 
 FILE_URL = f"{BLOB_URL}/{UPDATE_FILE}"
 VERSION_URL = f"{BLOB_URL}/{VERSION_FILE}"
+
+# ============ ALLOWED TRIGGERS (управление контентом по подписке) ============
+if IS_DEVELOPMENT:
+    ALLOWED_TRIGGERS_FILE = "allowed_triggers-dev.json"
+else:
+    ALLOWED_TRIGGERS_FILE = "allowed_triggers.json"
+
+ALLOWED_TRIGGERS_URL = f"{BLOB_URL}/{ALLOWED_TRIGGERS_FILE}"
+ALLOWED_HTTP_METHODS = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
+TIER_NAME_PATTERN = re.compile(r"^[a-z0-9_\-]{1,30}$")
+
+DEFAULT_ALLOWED_TRIGGERS = {
+    "free": [
+        "GET:index.html?aicc_sid=",
+        "GET:mode=home",
+        "GET:cabinet",
+        "GET:qti_return.html"
+    ],
+    "premium": [
+        "GET:index.html?aicc_sid=",
+        "GET:mode=home",
+        "GET:cabinet",
+        "GET:qti_return.html",
+        "POST:qti_return.html",
+        "GET:quiz1.js",
+        "GET:quiz2.js",
+        "GET:data/video",
+        "GET:/loc_web/",
+        "POST:handler.html"
+    ],
+    "pro": "ALL"
+}
 
 @app.get("/api/update/check")
 async def check_update():
@@ -384,6 +417,161 @@ async def clear_all_subscriptions(admin: str = Depends(verify_admin)):
         "success": True,
         "action": "cleared all subscriptions"
     }
+
+# ============ ALLOWED TRIGGERS ENDPOINTS ============
+
+def validate_triggers(rules) -> dict:
+    """Валидирует структуру allowed_triggers.
+
+    Ожидаемый формат:
+    {
+      "free": ["GET:index.html?aicc_sid=", ...],
+      "pro": "ALL"
+    }
+    """
+    if not isinstance(rules, dict) or not rules:
+        raise HTTPException(
+            status_code=400,
+            detail="Rules must be a non-empty object: {\"tier\": [\"GET:path\", ...] | \"ALL\"}"
+        )
+
+    validated = {}
+    for tier, value in rules.items():
+        tier = str(tier).strip().lower()
+        if not TIER_NAME_PATTERN.match(tier):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid tier name: '{tier}' (allowed: a-z, 0-9, _, -, max 30 chars)"
+            )
+
+        if isinstance(value, str):
+            if value.strip().upper() == "ALL":
+                validated[tier] = "ALL"
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Tier '{tier}': string value must be 'ALL'"
+                )
+        elif isinstance(value, list):
+            clean_rules = []
+            for item in value:
+                if not isinstance(item, str):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Tier '{tier}': each rule must be a string"
+                    )
+                rule = item.strip()
+                if not rule:
+                    continue
+                match = re.match(
+                    r"^(" + "|".join(ALLOWED_HTTP_METHODS) + r"):(.+)$",
+                    rule,
+                    re.IGNORECASE
+                )
+                if not match:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Tier '{tier}': invalid rule '{rule}'. "
+                            f"Expected format 'METHOD:path', "
+                            f"METHOD one of {sorted(ALLOWED_HTTP_METHODS)}"
+                        )
+                    )
+                clean_rules.append(f"{match.group(1).upper()}:{match.group(2)}")
+            validated[tier] = clean_rules
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tier '{tier}': value must be a list of rules or 'ALL'"
+            )
+
+    return validated
+
+
+async def write_triggers_to_blob(rules: dict) -> dict:
+    """Записывает rules в allowed_triggers.json на Vercel Blob."""
+    token = os.getenv("BLOB_READ_WRITE_TOKEN")
+    if not token:
+        raise HTTPException(
+            status_code=503,
+            detail="BLOB_READ_WRITE_TOKEN is not configured"
+        )
+
+    payload = json.dumps(rules, ensure_ascii=False, indent=2).encode("utf-8")
+
+    try:
+        client = AsyncBlobClient(token=token)
+        blob = await client.put(
+            ALLOWED_TRIGGERS_FILE,
+            payload,
+            access="public",
+            content_type="application/json",
+            add_random_suffix=False,
+            overwrite=True,
+            cache_control_max_age=60
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to write triggers to blob: {str(e)}"
+        )
+
+    return {"url": blob.url, "pathname": blob.pathname}
+
+
+@app.get("/api/triggers")
+async def get_allowed_triggers():
+    """Публичное чтение allowed_triggers (для системы контроля контента)."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(ALLOWED_TRIGGERS_URL)
+            if response.status_code == 200:
+                return {
+                    "source": "blob",
+                    "file": ALLOWED_TRIGGERS_FILE,
+                    "rules": response.json()
+                }
+    except Exception:
+        pass
+
+    return {
+        "source": "default",
+        "file": ALLOWED_TRIGGERS_FILE,
+        "rules": DEFAULT_ALLOWED_TRIGGERS
+    }
+
+
+@app.put("/api/triggers/admin")
+async def save_allowed_triggers(
+    rules: dict = Body(...),
+    admin: str = Depends(verify_admin)
+):
+    """Сохраняет правила allowed_triggers в Vercel Blob."""
+    validated = validate_triggers(rules)
+    blob_info = await write_triggers_to_blob(validated)
+
+    return {
+        "success": True,
+        "file": ALLOWED_TRIGGERS_FILE,
+        "rules": validated,
+        **blob_info
+    }
+
+
+@app.post("/api/triggers/admin/reset")
+async def reset_allowed_triggers(admin: str = Depends(verify_admin)):
+    """Сбрасывает правила к значениям по умолчанию."""
+    blob_info = await write_triggers_to_blob(DEFAULT_ALLOWED_TRIGGERS)
+
+    return {
+        "success": True,
+        "file": ALLOWED_TRIGGERS_FILE,
+        "rules": DEFAULT_ALLOWED_TRIGGERS,
+        **blob_info
+    }
+
 
 @app.get("/api/health")
 async def health_check():

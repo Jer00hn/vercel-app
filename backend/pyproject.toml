@@ -9,5 +9,6 @@ dependencies = [
     "fastapi>=0.104.1",
     "uvicorn[standard]>=0.24.0",
     "upstash-redis",
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0",
+    "vercel>=0.10.0"
 ]

@@ -58,4 +58,16 @@ export const subscriptionApi = {
   }
 }
 
+export const triggersApi = {
+  getTriggers() {
+    return api.get('/triggers')
+  },
+  saveTriggers(rules) {
+    return api.put('/triggers/admin', rules)
+  },
+  resetTriggers() {
+    return api.post('/triggers/admin/reset')
+  }
+}
+
 export default api

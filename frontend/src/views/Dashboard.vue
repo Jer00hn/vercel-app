@@ -83,6 +83,9 @@
           @revoke="handleRevoke"
         />
 
+        <!-- Правила доступа по подпискам (allowed_triggers) -->
+        <TriggerRules />
+
         <!-- Dialog: Extend -->
         <div v-if="extendDialog.show" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div class="bg-white rounded-lg p-6 max-w-md w-full">
@@ -167,6 +170,7 @@ import { subscriptionApi } from '../api'
 import StatsCards from '../components/StatsCard.vue'
 import SubscriptionForm from '../components/SubscriptionForm.vue'
 import SubscriptionList from '../components/SubscriptionList.vue'
+import TriggerRules from '../components/TriggerRules.vue'
 
 const isAuthenticated = ref(false)
 const tokenInput = ref('')
