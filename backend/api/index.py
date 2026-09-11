@@ -79,9 +79,6 @@ BLOB_URL = "https://sf9o8bhy9rirx6lg.public.blob.vercel-storage.com"
 
 IS_DEVELOPMENT = os.getenv("ENVIRONMENT") == "development"
 
-FILE_URL = f"{BLOB_URL}/{UPDATE_FILE}"
-VERSION_URL = f"{BLOB_URL}/{VERSION_FILE}"
-
 # ============ ALLOWED TRIGGERS (управление контентом по подписке) ============
 if IS_DEVELOPMENT:
     ALLOWED_TRIGGERS_FILE = "allowed_triggers-dev.json"
