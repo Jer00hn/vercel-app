@@ -79,13 +79,6 @@ BLOB_URL = "https://sf9o8bhy9rirx6lg.public.blob.vercel-storage.com"
 
 IS_DEVELOPMENT = os.getenv("ENVIRONMENT") == "development"
 
-if IS_DEVELOPMENT:
-    VERSION_FILE = "version-dev.json"
-    UPDATE_FILE = "update-dev.zip"
-else:
-    VERSION_FILE = "version.json"
-    UPDATE_FILE = "update-bytecode.zip"
-
 FILE_URL = f"{BLOB_URL}/{UPDATE_FILE}"
 VERSION_URL = f"{BLOB_URL}/{VERSION_FILE}"
 
@@ -121,42 +114,6 @@ DEFAULT_ALLOWED_TRIGGERS = {
     "pro": "ALL"
 }
 
-@app.get("/api/update/check")
-async def check_update():
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(VERSION_URL)
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return JSONResponse(
-                    status_code=404,
-                    content={"error": "Version file not found"}
-                )
-                
-    except httpx.TimeoutException:
-        return JSONResponse(
-            status_code=503,
-            content={"error": "Version check timeout"}
-        )
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
-
-@app.get("/api/update/proxy")
-async def download_proxy():
-    print(f"check is aviable: {FILE_URL}")
-    file_info = await check_file_availability(FILE_URL)
-    
-    if not file_info["available"]:
-        return await fallback_to_github()
-    
-    return await proxy_file(FILE_URL, file_info["size"])
-
-
 FILENAME_PATTERN = re.compile(r"^[\w.\- ]+$")
 
 @app.get("/api/download")
@@ -166,7 +123,7 @@ async def download_file(
     if not FILENAME_PATTERN.match(filename):
         raise HTTPException(status_code=400, detail="Invalid filename")
     
-    file_url = f"{BLOB_URL}/{filename}"
+    file_url = f"{BLOB_URL}/updates/{filename}"
     print(f"download requested: {file_url}")
     
     file_info = await check_file_availability(file_url)
