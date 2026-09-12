@@ -501,13 +501,13 @@ async def sign(
     admin: str = Depends(verify_admin)
 ):
     # 1. Проверка токена
-    token = os.getenv("BLOBREADWRITE_TOKEN")
+    token = os.getenv("BLOB_READ_WRITE_TOKEN")
     if not token:
-        raise HTTPException(500, "Missing BLOBREADWRITE_TOKEN")
+        raise HTTPException(500, "Missing BLOB_READ_WRITE_TOKEN")
 
     # 2. Чтение файла
     try:
-        versioncontent = await versionfile.read()
+        version_content = await version_file.read()
     except Exception as e:
         raise HTTPException(400, f"Failed to read uploaded file: {e}")
 
@@ -523,9 +523,9 @@ async def sign(
             version_content,
             access="public",
             content_type="application/json",
-            addrandomsuffix=False,
+            add_random_suffix=False,
             overwrite=True,
-            cachecontrolmax_age=60
+            cache_control_max_age=60
         )
 
     except Exception as e:
