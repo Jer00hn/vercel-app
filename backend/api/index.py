@@ -498,12 +498,10 @@ async def get_allowed_triggers():
 @app.put("/api/sign")
 async def sign(
     version_file: UploadFile = File(...),
-    signature_file: UploadFile = File(...),
     admin: str = Depends(verify_admin)
 ):
     # 2. Чтение содержимого
     version_content = await version_file.read()
-    sig_content = await signature_file.read()
     token = os.getenv("BLOB_READ_WRITE_TOKEN")
 
     # 3. Загрузка в Vercel Blob через официальный AsyncBlobClient
@@ -516,17 +514,6 @@ async def sign(
             version_content,
             access="public",
             content_type="application/json",
-            add_random_suffix=False,
-            overwrite=True,
-            cache_control_max_age=60
-        )
-
-        # Загружаем version.json.asc (или .sig)
-        await client.put(
-            "updates/version.json.asc",
-            sig_content,
-            access="public",
-            content_type="application/pgp-signature",  # или application/octet-stream
             add_random_suffix=False,
             overwrite=True,
             cache_control_max_age=60
