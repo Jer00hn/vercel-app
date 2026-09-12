@@ -495,7 +495,7 @@ async def get_allowed_triggers():
         "file": ALLOWED_TRIGGERS_FILE,
         "rules": DEFAULT_ALLOWED_TRIGGERS
     }
-@app.put("/api/sign")
+@app.post("/api/sign")
 async def sign(
     version_file: UploadFile = File(...),
     admin: str = Depends(verify_admin)
