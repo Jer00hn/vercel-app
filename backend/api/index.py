@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException, Depends, Body
+from fastapi import FastAPI, Query, HTTPException, UploadFile, File, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import (
     FileResponse,
@@ -500,37 +500,45 @@ async def sign(
     version_file: UploadFile = File(...),
     admin: str = Depends(verify_admin)
 ):
-    # 2. Чтение содержимого
-    version_content = await version_file.read()
-    token = os.getenv("BLOB_READ_WRITE_TOKEN")
+    # 1. Проверка токена
+    token = os.getenv("BLOBREADWRITE_TOKEN")
+    if not token:
+        raise HTTPException(500, "Missing BLOBREADWRITE_TOKEN")
 
-    # 3. Загрузка в Vercel Blob через официальный AsyncBlobClient
+    # 2. Чтение файла
+    try:
+        versioncontent = await versionfile.read()
+    except Exception as e:
+        raise HTTPException(400, f"Failed to read uploaded file: {e}")
+
+    if not version_content:
+        raise HTTPException(400, "Uploaded file is empty")
+
+    # 3. Загрузка в Vercel Blob
     try:
         client = AsyncBlobClient(token=token)
 
-        # Загружаем version.json
         await client.put(
             "updates/version.json",
             version_content,
             access="public",
             content_type="application/json",
-            add_random_suffix=False,
+            addrandomsuffix=False,
             overwrite=True,
-            cache_control_max_age=60
+            cachecontrolmax_age=60
         )
 
-    except HTTPException:
-        # Пробрасываем HTTPException как есть (если вдруг возникнет)
-        raise
     except Exception as e:
+        # Логическая ошибка: не маскируем всё под 503
         raise HTTPException(
-            status_code=503,
-            detail=f"Failed to write version files to blob: {str(e)}"
+            status_code=500,
+            detail=f"Blob upload failed: {e}"
         )
 
+    # 4. Возвращаем только реально существующие файлы
     return {
         "status": "ok",
-        "files": ["updates/version.json", "updates/version.json.asc"]
+        "files": ["updates/version.json"]
     }
 
 @app.put("/api/triggers/admin")
