@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException, UploadFile, File, Depends, Body
+from fastapi import FastAPI, Query, HTTPException, UploadFile, File, Depends, Body, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import (
     FileResponse,
@@ -12,6 +12,7 @@ import os
 import re
 import json
 import httpx
+import mimetypes
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -603,37 +604,59 @@ async def api_root():
         }
     }
 
+
 async def proxy_file(url: str, file_size: int, filename: str = "update.zip"):
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # 1. Автоматически определяем MIME-тип по имени файла
+        mime_type, _ = mimetypes.guess_type(filename)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             response = await client.get(url)
-            
+
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail="Failed to fetch file"
+                    detail="Failed to fetch file",
                 )
-            
-            return StreamingResponse(
-                iter([response.content]),
-                media_type="application/octet-stream",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                    "Content-Length": str(len(response.content)),
-                    "X-File-Source": "blob-proxy",
-                    "Cache-Control": "no-cache, no-store"
-                }
-            )          
+
+            # 2. Формируем заголовки
+            headers = {
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(response.content)),
+                "X-File-Source": "blob-proxy",
+                "Cache-Control": "no-cache, no-store",
+            }
+
+            # 3. Для текстовых и bash-скриптов отдаём Response, для больших бинарников/zip — StreamingResponse
+            if (
+                mime_type.startswith("text/")
+                or filename.endswith(".sh")
+                or filename.endswith(".bash")
+            ):
+                return Response(
+                    content=response.content,
+                    media_type="text/plain; charset=utf-8",
+                    headers=headers,
+                )
+
+            return Response(
+                content=response.content,
+                media_type=mime_type,
+                headers=headers,
+            )
+
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=504,
-            detail="Storage timeout - try using redirect endpoint"
+            detail="Storage timeout - try using redirect endpoint",
         )
     except Exception as e:
         raise HTTPException(
-            status_code=503,
-            detail=f"Proxy download failed: {str(e)}"
+            status_code=503, detail=f"Proxy download failed: {str(e)}"
         )
+
 
 async def check_file_availability(url: str):
     async with httpx.AsyncClient() as client:
